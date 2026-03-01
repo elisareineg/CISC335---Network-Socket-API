@@ -3,6 +3,7 @@ import java.util.Random;
 import java.util.Scanner;
 import java.util.Random;
 import java.net.DatagramSocket;
+import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.lang.Object;
 import java.util.ArrayList;
@@ -160,10 +161,22 @@ public class NetworkSocket {
         query[pos++] = 0x00;
         query[pos++] = 0x01;
 
-        System.out.println(Arrays.toString(query));
+        // System.out.println(Arrays.toString(query));
     }
 
-    public static void sendQuery(byte query) {
-        //
+    public static void sendQuery(byte[] queryPacket) {
+        // need either IP of local dns: 127.0.0.1 or known public server like
+        // google:8.8.8.8
+        // port 53
+
+        // create packet for connectionless delivery service
+        InetAddress serverAddress = InetAddress.getByName("8.8.8.8");
+int     port = 53;  
+        DatagramPacket pkt = new DatagramPacket(queryPacket, queryPacket.length, serverAddress, port);
+        // create datagram socket
+        DatagramSocket socket = new DatagramSocket(); // UDP so don't need to connect yet to specific host
+        socket.send(pkt);
+        
     }
+
 }
