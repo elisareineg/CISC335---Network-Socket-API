@@ -24,6 +24,9 @@ import java.util.List;
  * our project.
  */
 
+
+ // I used www.google.com/www.youtube.com for testing and local dns server 8.8.8.8 for this assignment
+
 public class NetworkSocket {
     private static Scanner scanner = new Scanner(System.in); // define single Scanner obj as
     // static so it can be shared across methods
@@ -33,9 +36,14 @@ public class NetworkSocket {
         if (input.length() == 0) {
             System.out.println("Hostname must have a value");
         }
+        String dnsServer = "8.8.8.8"; // local server
         byte[] query = createQuery(input);
         DatagramPacket response = sendReceiveQuery(query);
+
         // question sect of parse response
+
+        System.out.println("Server:\t\t" + dnsServer); // for sake of formatting like nslookup 
+        System.out.println("Address:\t" + dnsServer + "#53\n"); // ^
         System.out.println("\n QUESTION SECTION:");
         System.out.println(input);
         parseResponse(response, response.getLength());
@@ -65,6 +73,7 @@ public class NetworkSocket {
 
         Random random = new Random();
         int transactionID = random.nextInt(65536);
+        // System.out.println("Transaction ID: 0x" + Integer.toHexString(transactionID));   -> 0xd879 same as in wireshark
 
         byte[] header = new byte[12];
         header[0] = (byte) ((transactionID >> 8) & 0xFF); // High 8 bits
@@ -170,15 +179,17 @@ public class NetworkSocket {
         // System.out.println(Arrays.toString(query));
     }
 
+
     public static DatagramPacket sendReceiveQuery(byte[] queryPacket) throws Exception {
         // need either IP of local dns: 127.0.0.1 or known public server like
         // google:8.8.8.8
         // port 53
 
-        // create packet for connectionless delivery service
+        // create packet 
         InetAddress serverAddress = InetAddress.getByName("8.8.8.8");
         int port = 53;
         DatagramPacket pkt = new DatagramPacket(queryPacket, queryPacket.length, serverAddress, port);
+
         // create datagram socket
         DatagramSocket socket = new DatagramSocket(); // UDP so don't need to connect yet to specific host
         socket.setSoTimeout(5000); // 5 seconds
@@ -235,12 +246,17 @@ public class NetworkSocket {
                 int ptr = offset; // initalize pointer
                 // read labels from offset pos
                 while (data[ptr] != 0) {
-                    int labelLen = data[ptr] & 0xFF; // convert to unsigned int
+                    if ((data[ptr] & 0xC0) == 0xC0) {
+                        // nested pointer
+                        ptr = ((data[ptr] & 0x3F) << 8) | (data[ptr + 1] & 0xFF);
+                        continue;
+                    }
+                    int labelLen = data[ptr] & 0xFF;
                     ptr++;
                     for (int j = 0; j < labelLen; j++) {
                         name.append((char) data[ptr++]);
                     }
-                    name.append("."); // each . in hostname
+                    name.append(".");
                 }
     
             } else {
@@ -272,19 +288,24 @@ public class NetworkSocket {
             i += 2;
 
             // RDATA: A exactly 4 bytes representing IPv4 address: 142 250 80 46, join with string after
-            int j = 0;
             StringBuilder rData = new StringBuilder();
-            while (j < rdLength) {
-                int curr = data[i] & 0xFF;
-                rData.append(curr);
-    
-                if (j < rdLength - 1) {
-                    rData.append(".");
+            if (type == 1) {
+                int j = 0;
+                while (j < rdLength) {
+                    int curr = data[i] & 0xFF;
+                    rData.append(curr);
+                    if (j < rdLength - 1) {
+                        rData.append(".");
+                    }
+                    i++;
+                    j++;
                 }
-                i++;
-                j++;
+                System.out.println("Name:\t" + name);
+                System.out.println("Address: " + rData);
+
+            } else {
+                i += rdLength; // skip non-A records like CNAME
             }
-            System.out.println("Name: " + name + "Type: " + type + "Class" + c + "TTL" + ttl + "RDLength: " + rdLength + "RDATA: " + rData);
             count++;
         }
 
@@ -356,10 +377,14 @@ public class NetworkSocket {
                     i++;
                     j++;
                 }
+
+                System.out.println("Name:\t" + name);
+                System.out.println("Address: " + rData);
+
             } else {
                 i += rdLength; // if not type A
             }
-            System.out.println("Name: " + name + "Type: " + type + "Class" + c + "TTL" + ttl + "RDLength: " + rdLength + "RDATA: " + rData);
+            
             count++;
             
         }
@@ -430,11 +455,13 @@ public class NetworkSocket {
                     i++;
                     j++;
                 }
+
+                System.out.println("Name:\t" + name);
+                System.out.println("Address: " + rData);
+
             } else {
                 i += rdLength; // if not type A
             }
-        
-            System.out.println("Name: " + name + "Type: " + type + "Class" + c + "TTL" + ttl + "RDLength: " + rdLength + "RDATA: " + rData);
             count++;
         }
 
